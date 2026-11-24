@@ -280,6 +280,20 @@
   .verdict.same { color: var(--green); border-color: rgba(34,201,138,.3); background: var(--green-dim); }
   .verdict.diff { color: var(--amber); border-color: rgba(245,166,35,.3); background: var(--amber-dim); }
 
+  /* 出口分组列表 */
+  .exit-list { display: flex; flex-direction: column; }
+  .exit-row {
+    display: flex; align-items: center; gap: 9px;
+    padding: 8px 0 8px 10px;
+    border-top: 1px solid var(--border);
+    border-left: 2px solid transparent;
+    font-size: 11.5px;
+  }
+  .exit-row:first-child { border-top: none; }
+  .exit-ip { font-family: var(--mono); font-size: 12px; color: var(--text); }
+  .exit-loc { color: var(--text3); }
+  .exit-src { margin-left: auto; color: var(--text3); font-size: 10.5px; text-align: right; white-space: nowrap; }
+
   .ip-table { width: 100%; border-collapse: collapse; font-size: 12px; }
 
   .ip-table th {
@@ -428,6 +442,8 @@
     .qgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .qrow { flex-direction: column; }
     .qrow button { padding: 10px; }
+    .exit-row { flex-wrap: wrap; gap: 4px 9px; }
+    .exit-src { margin-left: 0; width: 100%; text-align: left; white-space: normal; }
   }
 
   @media (max-width: 380px) { .grid { grid-template-columns: 1fr; } }
@@ -456,13 +472,10 @@
   </div>
 
   <div class="map-wrap" id="summaryWrap" style="display:none">
-    <div class="map-title">多源对比<span class="verdict" id="verdict"></span></div>
-    <table class="ip-table">
-      <thead>
-        <tr><th>数据源</th><th>IP 地址</th><th>归属地</th><th>运营商</th></tr>
-      </thead>
-      <tbody id="summaryBody"></tbody>
-    </table>
+    <div class="map-title">出口一致性<span class="verdict" id="verdict"></span></div>
+    <div class="exit-list" id="exitList"></div>
+  </div>
+
   <div class="map-wrap">
     <div class="map-title">反查任意 IP / 域名</div>
     <form class="qrow" id="qForm">
@@ -535,7 +548,11 @@
   };
 
   function placeOf(d) {
-    const arr = [countryCN(d.cc, d.country), zhPlace(d.region), zhPlace(d.city)];
+    const cn = countryCN(d.cc, d.country);
+    const en = String(d.country || '').trim().toLowerCase();
+    // 城市/省份与国名同名时（Singapore / Singapore）跳过，避免重复
+    const dup = v => v && en && String(v).trim().toLowerCase() === en;
+    const arr = [cn, zhPlace(d.region), zhPlace(d.city)].filter((v, i) => i === 0 || !dup(v));
     const out = [];
     arr.forEach(v => { if (v && out.indexOf(v) === -1) out.push(v); });
     return out;
@@ -671,32 +688,35 @@
                  : failCard(s);
   }
 
-  /* ══════════ 汇总 ══════════ */
+  /* ══════════ 出口一致性 ══════════ */
   function paintSummary() {
     if (!SOURCES.every(s => state[s.id] && state[s.id].done)) return;
-    const rows = SOURCES.map(s => {
-      const st = state[s.id];
-      const d = st.kind === 'ok' ? st.data : null;
-      const loc = d ? (placeOf(d).join(' / ') || '—') : '<span class="dim">—</span>';
-      const org = d && d.org ? esc(d.org) : '<span class="dim">—</span>';
-      const ipCell = d ? `<span class="mono">${esc(d.ip)}</span>` : '<span class="dim">不可用</span>';
-      return `<tr>
-        <td><span class="color-dot" style="background:${s.color}"></span>${s.label}</td>
-        <td>${ipCell}</td>
-        <td>${loc}</td>
-        <td style="font-size:11px">${org}</td>
-      </tr>`;
-    }).join('');
-    $('summaryBody').innerHTML = rows;
 
-    // 一致性判定：所有成功返回的 IP 是否相同
-    const ips = SOURCES.map(s => state[s.id]).filter(st => st.kind === 'ok' && st.data && st.data.ip)
-                       .map(st => st.data.ip);
-    const uniq = Array.from(new Set(ips));
+    // 按出口 IP 分组：同一 IP 的来源归为一组，只展示「哪几个源走出了同一个出口」
+    const groups = [];
+    const seen = Object.create(null);
+    SOURCES.forEach(s => {
+      const st = state[s.id];
+      if (st.kind !== 'ok' || !st.data || !st.data.ip) return;
+      const ip = st.data.ip;
+      if (!seen[ip]) {
+        seen[ip] = { ip: ip, loc: placeOf(st.data).join(' / '), color: s.color, srcs: [] };
+        groups.push(seen[ip]);
+      }
+      seen[ip].srcs.push(s.label);
+    });
+
     const v = $('verdict');
-    if (!ips.length) { v.textContent = '无数据'; v.className = 'verdict diff'; }
-    else if (uniq.length === 1) { v.textContent = '全部一致'; v.className = 'verdict same'; }
-    else { v.textContent = '存在 ' + uniq.length + ' 个不同出口'; v.className = 'verdict diff'; }
+    if (!groups.length) { v.textContent = '无数据'; v.className = 'verdict diff'; }
+    else if (groups.length === 1) { v.textContent = '全部一致'; v.className = 'verdict same'; }
+    else { v.textContent = groups.length + ' 个不同出口'; v.className = 'verdict diff'; }
+
+    $('exitList').innerHTML = groups.map(g =>
+      '<div class="exit-row" style="border-left-color:' + g.color + '">' +
+        '<span class="exit-ip">' + esc(g.ip) + '</span>' +
+        '<span class="exit-loc">' + esc(g.loc || '归属地未知') + '</span>' +
+        '<span class="exit-src">' + esc(g.srcs.join(' · ')) + '</span>' +
+      '</div>').join('');
 
     $('summaryWrap').style.display = 'block';
   }
