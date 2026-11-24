@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>IP 出口检测</title>
 <meta name="description" content="从多个独立数据源检测你的公网 IP、IPv4 / IPv6 出口、归属地与运营商，并校验多源结果是否一致。">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='88'>🛰️</text></svg>">
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0naHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmcnIHZpZXdCb3g9JzAgMCA2NCA2NCc+PHJlY3Qgd2lkdGg9JzY0JyBoZWlnaHQ9JzY0JyByeD0nMTMnIGZpbGw9JyMwZDBmMTQnLz48cmVjdCB4PScwLjUnIHk9JzAuNScgd2lkdGg9JzYzJyBoZWlnaHQ9JzYzJyByeD0nMTIuNScgZmlsbD0nbm9uZScgc3Ryb2tlPScjMjJjOThhJyBzdHJva2Utb3BhY2l0eT0nLjI4JyBzdHJva2Utd2lkdGg9JzEnLz48dGV4dCB4PSczMicgeT0nNDUuNScgdGV4dC1hbmNob3I9J21pZGRsZScgZm9udC1mYW1pbHk9J3VpLW1vbm9zcGFjZSxTRk1vbm8tUmVndWxhcixNZW5sbyxDb25zb2xhcyxtb25vc3BhY2UnIGZvbnQtc2l6ZT0nMzgnIGZvbnQtd2VpZ2h0PSc3MDAnIGZpbGw9JyMyMmM5OGEnPklQPC90ZXh0Pjwvc3ZnPg==">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
@@ -225,6 +225,14 @@
     gap: 8px;
   }
 
+  .act-left {
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    flex-wrap: wrap;
+    min-width: 0;
+  }
+
   .ts { font-size: 11px; color: var(--text3); font-family: var(--mono); }
 
   .refresh {
@@ -268,7 +276,7 @@
   }
 
   .verdict {
-    margin-left: auto;
+    display: none;
     text-transform: none;
     letter-spacing: 0;
     font-family: var(--mono);
@@ -276,53 +284,10 @@
     padding: 2px 9px;
     border-radius: 999px;
     border: 1px solid;
+    white-space: nowrap;
   }
   .verdict.same { color: var(--green); border-color: rgba(34,201,138,.3); background: var(--green-dim); }
   .verdict.diff { color: var(--amber); border-color: rgba(245,166,35,.3); background: var(--amber-dim); }
-
-  /* 出口分组列表 */
-  .exit-list { display: flex; flex-direction: column; }
-  .exit-row {
-    display: flex; align-items: center; gap: 9px;
-    padding: 8px 0 8px 10px;
-    border-top: 1px solid var(--border);
-    border-left: 2px solid transparent;
-    font-size: 11.5px;
-  }
-  .exit-row:first-child { border-top: none; }
-  .exit-ip { font-family: var(--mono); font-size: 12px; color: var(--text); }
-  .exit-loc { color: var(--text3); }
-  .exit-src { margin-left: auto; color: var(--text3); font-size: 10.5px; text-align: right; white-space: nowrap; }
-
-  .ip-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-
-  .ip-table th {
-    color: var(--text3);
-    font-weight: 500;
-    text-align: left;
-    padding: 4px 8px 8px 0;
-    border-bottom: 1px solid var(--border);
-    white-space: nowrap;
-  }
-
-  .ip-table td {
-    padding: 7px 8px 7px 0;
-    border-bottom: 1px solid var(--border);
-    vertical-align: middle;
-    color: var(--text2);
-  }
-
-  .ip-table tr:last-child td { border-bottom: none; }
-  .ip-table .mono { font-family: var(--mono); color: var(--text); }
-  .ip-table .dim { color: var(--text3); }
-
-  .color-dot {
-    display: inline-block;
-    width: 7px; height: 7px;
-    border-radius: 50%;
-    margin-right: 6px;
-    vertical-align: middle;
-  }
 
   /* ── 反查工具 ── */
   .qrow { display: flex; gap: 8px; }
@@ -442,8 +407,6 @@
     .qgrid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .qrow { flex-direction: column; }
     .qrow button { padding: 10px; }
-    .exit-row { flex-wrap: wrap; gap: 4px 9px; }
-    .exit-src { margin-left: 0; width: 100%; text-align: left; white-space: normal; }
   }
 
   @media (max-width: 380px) { .grid { grid-template-columns: 1fr; } }
@@ -461,7 +424,10 @@
   <div class="grid" id="grid"></div>
 
   <div class="actions">
-    <span class="ts" id="ts">正在检测…</span>
+    <div class="act-left">
+      <span class="ts" id="ts">正在检测…</span>
+      <span class="verdict" id="verdict"></span>
+    </div>
     <button class="refresh" id="refreshBtn">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/>
@@ -469,11 +435,6 @@
       </svg>
       重新检测
     </button>
-  </div>
-
-  <div class="map-wrap" id="summaryWrap" style="display:none">
-    <div class="map-title">出口一致性<span class="verdict" id="verdict"></span></div>
-    <div class="exit-list" id="exitList"></div>
   </div>
 
   <div class="map-wrap">
@@ -688,37 +649,22 @@
                  : failCard(s);
   }
 
-  /* ══════════ 出口一致性 ══════════ */
-  function paintSummary() {
+  /* ══════════ 出口判定 ══════════ */
+  function paintVerdict() {
     if (!SOURCES.every(s => state[s.id] && state[s.id].done)) return;
 
-    // 按出口 IP 分组：同一 IP 的来源归为一组，只展示「哪几个源走出了同一个出口」
-    const groups = [];
-    const seen = Object.create(null);
+    const ips = [];
     SOURCES.forEach(s => {
       const st = state[s.id];
-      if (st.kind !== 'ok' || !st.data || !st.data.ip) return;
-      const ip = st.data.ip;
-      if (!seen[ip]) {
-        seen[ip] = { ip: ip, loc: placeOf(st.data).join(' / '), color: s.color, srcs: [] };
-        groups.push(seen[ip]);
-      }
-      seen[ip].srcs.push(s.label);
+      if (st.kind === 'ok' && st.data && st.data.ip && ips.indexOf(st.data.ip) === -1) ips.push(st.data.ip);
     });
 
     const v = $('verdict');
-    if (!groups.length) { v.textContent = '无数据'; v.className = 'verdict diff'; }
-    else if (groups.length === 1) { v.textContent = '全部一致'; v.className = 'verdict same'; }
-    else { v.textContent = groups.length + ' 个不同出口'; v.className = 'verdict diff'; }
+    if (!ips.length) { v.style.display = 'none'; return; }
 
-    $('exitList').innerHTML = groups.map(g =>
-      '<div class="exit-row" style="border-left-color:' + g.color + '">' +
-        '<span class="exit-ip">' + esc(g.ip) + '</span>' +
-        '<span class="exit-loc">' + esc(g.loc || '归属地未知') + '</span>' +
-        '<span class="exit-src">' + esc(g.srcs.join(' · ')) + '</span>' +
-      '</div>').join('');
-
-    $('summaryWrap').style.display = 'block';
+    v.style.display = 'inline-block';
+    if (ips.length === 1) { v.textContent = '出口一致'; v.className = 'verdict same'; }
+    else { v.textContent = '存在 ' + ips.length + ' 个不同出口'; v.className = 'verdict diff'; }
   }
 
   /* ══════════ 反查归属地（多源兜底） ══════════ */
@@ -781,8 +727,8 @@
 
     SOURCES.forEach(s => { state[s.id] = { done: false }; });
     $('grid').innerHTML = SOURCES.map(skeletonCard).join('');
-    $('summaryWrap').style.display = 'none';
     $('ts').textContent = '正在检测…';
+    $('verdict').style.display = 'none';
 
     const btn = $('refreshBtn');
     btn.classList.add('spinning');
@@ -793,7 +739,7 @@
       if (data) state[s.id] = { done: true, kind: 'ok', data };
       else state[s.id] = { done: true, kind: s.noneText ? 'none' : 'fail' };
       paint(s);
-      paintSummary();
+      paintVerdict();
     }));
 
     $('ts').textContent = '更新于 ' + new Date().toLocaleTimeString('zh-CN', { hour12: false });
