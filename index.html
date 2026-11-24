@@ -471,13 +471,6 @@
     </form>
     <div class="qout" id="qOut"></div>
   </div>
-
-  <div class="map-wrap">
-    <div class="map-title">本机环境</div>
-    <table class="ip-table">
-      <tbody id="envBody"></tbody>
-    </table>
-  </div>
 </main>
 
 <footer>
@@ -823,23 +816,6 @@
     if (h && location.protocol.indexOf('http') === 0 && h !== '127.0.0.1' && h !== 'localhost') {
       $('siteHost').textContent = h;
     }
-  })();
-
-  /* ══════════ 本机环境 ══════════ */
-  (function renderEnv() {
-    const nav = navigator;
-    const rows = [
-      ['User-Agent', nav.userAgent],
-      ['语言', (nav.languages && nav.languages.length ? nav.languages : [nav.language]).join(', ')],
-      ['平台', (nav.userAgentData && nav.userAgentData.platform) || nav.platform || '—'],
-      ['屏幕', screen.width + ' × ' + screen.height + ' @' + (window.devicePixelRatio || 1) + 'x'],
-      ['时区', Intl.DateTimeFormat().resolvedOptions().timeZone || '—'],
-      ['本地时间', new Date().toLocaleString('zh-CN', { hour12: false })],
-      ['Do Not Track', nav.doNotTrack === '1' ? '已开启' : '未开启']
-    ];
-    $('envBody').innerHTML = rows.map(([k, v]) =>
-      '<tr><td style="width:22%;white-space:nowrap;color:var(--text3);font-size:11px">' + esc(k) + '</td>' +
-      '<td style="font-size:11.5px;font-family:var(--mono);word-break:break-all">' + esc(v) + '</td></tr>').join('');
   })();
 
   /* ══════════ 反查 IP / 域名 ══════════ */
